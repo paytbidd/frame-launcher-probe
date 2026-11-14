@@ -79,6 +79,7 @@
     var d = new Date(), h = d.getHours() % 12 || 12, m = d.getMinutes();
     $('time').textContent = h + ':' + (m < 10 ? '0' : '') + m;
     $('date').textContent = DAYS[d.getDay()] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate();
+    setText('fs-clock', $('time').textContent);
   }
 
   // ---------- App tiles ----------
@@ -292,13 +293,44 @@
     $('np-artist').textContent = sub;
     $('np-art').style.backgroundImage = img ? 'url("' + img + '")' : '';
     $('np-vol').textContent = np.volume === '' ? '--' : np.volume;
-    $('ic-play').style.display = playing ? 'none' : '';
-    $('ic-pause').style.display = playing ? '' : 'none';
+    setPlayIcons(playing);
+    // Full-screen view
+    setText('fs-source', (tag(doc, 'serviceName') || 'Now playing') + (playing || !title ? '' : '  ·  ' + np.state));
+    setText('fs-title', title || 'Nothing playing');
+    setText('fs-artist', artist && artist !== title ? artist : (tag(doc, 'title2') || ''));
+    setText('fs-album', album && album !== title ? album : '');
+    setText('fs-vol', np.volume === '' ? '--' : np.volume);
+    var art = img ? 'url("' + img + '")' : '';
+    if ($('fs-art')) $('fs-art').style.backgroundImage = art;
+    if ($('fs-bg')) $('fs-bg').style.backgroundImage = art;
     drawProgress();
   }
 
   function drawProgress() {
-    $('np-bar').style.width = np.totlen ? Math.min(100, (np.secs / np.totlen) * 100) + '%' : '0';
+    var w = np.totlen ? Math.min(100, (np.secs / np.totlen) * 100) + '%' : '0';
+    $('np-bar').style.width = w;
+    if ($('fs-bar')) $('fs-bar').style.width = w;
+    setText('fs-pos', np.totlen ? mmss(Math.min(np.secs, np.totlen)) : '');
+    setText('fs-len', np.totlen ? mmss(np.totlen) : '');
+  }
+  function mmss(t) { t = Math.floor(t); return Math.floor(t / 60) + ':' + (t % 60 < 10 ? '0' : '') + (t % 60); }
+  function setPlayIcons(playing) {
+    var a = document.querySelectorAll('.ic-play'), b = document.querySelectorAll('.ic-pause'), i;
+    for (i = 0; i < a.length; i++) a[i].style.display = playing ? 'none' : '';
+    for (i = 0; i < b.length; i++) b[i].style.display = playing ? '' : 'none';
+  }
+
+  // ---------- Full-screen now playing ----------
+  var fsOpen = false;
+  function openFs() {
+    fsOpen = true;
+    $('fs').className = 'fs';
+    focus.refresh(1);                                  // start on play/pause
+  }
+  function closeFs() {
+    fsOpen = false;
+    $('fs').className = 'fs hidden';
+    focus.refresh();
   }
   setInterval(function () {
     if (np.state === 'play' || np.state === 'stream') { np.secs += 1; drawProgress(); }
@@ -402,7 +434,7 @@
 
   // ---------- Focus / remote navigation ----------
   var focus = (function () {
-    var row = 0, idx = [0, 0], setIdx = 0;
+    var row = 0, idx = [0, 0], setIdx = 0, fsIdx = 1;
     function rows() {
       return [
         Array.prototype.slice.call(document.querySelectorAll('#apps .focusable')),
@@ -410,6 +442,7 @@
       ];
     }
     function setItems() { return Array.prototype.slice.call(document.querySelectorAll('#settings .focusable')); }
+    function fsItems() { return Array.prototype.slice.call(document.querySelectorAll('#fs .focusable')); }
     function paint() {
       var all = document.querySelectorAll('.focused');
       for (var i = 0; i < all.length; i++) all[i].classList.remove('focused');
@@ -428,6 +461,7 @@
     }
     function current() {
       if (settingsOpen) return setItems()[setIdx];
+      if (fsOpen) return fsItems()[fsIdx];
       var r = rows()[row];
       return r && r[Math.min(idx[row], r.length - 1)];
     }
@@ -435,7 +469,10 @@
       current: current,
       index: function () { return setIdx; },
       refresh: function (i) {
-        if (settingsOpen) {
+        if (fsOpen && !settingsOpen) {
+          if (typeof i === 'number') fsIdx = i;
+          fsIdx = Math.max(0, Math.min(fsIdx, fsItems().length - 1));
+        } else if (settingsOpen) {
           var n = setItems().length;
           if (typeof i === 'number') setIdx = i;
           setIdx = Math.max(0, Math.min(setIdx, n - 1));
@@ -445,6 +482,8 @@
       move: function (dx, dy) {
         if (settingsOpen) {
           setIdx = Math.max(0, Math.min(setItems().length - 1, setIdx + dy));
+        } else if (fsOpen) {
+          fsIdx = Math.max(0, Math.min(fsItems().length - 1, fsIdx + dx));
         } else {
           var r = rows();
           if (dy) row = Math.max(0, Math.min(r.length - 1, row + dy));
@@ -481,14 +520,18 @@
         var el = focus.current();
         if (!el) break;
         if (settingsOpen) settingsEnter(el);
+        else if (el.getAttribute('data-act') === 'fullscreen') openFs();
         else if (el.getAttribute('data-app')) launchApp(el.getAttribute('data-app'));
         else if (el.getAttribute('data-act') === 'settings') openSettings();
         else playerAction(el.getAttribute('data-act'));
         break;
       }
-      case K.BLUE: settingsOpen ? closeSettings() : openSettings(); break;
+      case K.BLUE:
+        if (settingsOpen) closeSettings();
+        else { if (fsOpen) closeFs(); openSettings(); }
+        break;
       case K.BACK: case K.ESC:
-        if (settingsOpen) closeSettings(); else history.back();
+        if (settingsOpen) closeSettings(); else if (fsOpen) closeFs(); else history.back();
         break;
       case K.YELLOW: case K.PLAYPAUSE: playerAction('toggle'); break;
       case K.PLAY: if (np.state !== 'play' && np.state !== 'stream') ampCmd('/Play'); break;

@@ -16,7 +16,7 @@
     <section id="apps" class="apps" data-row="1"></section>
 
     <section id="player" class="player">
-      <div id="np-art" class="np-art"></div>
+      <div id="np-art" class="np-art focusable" data-act="fullscreen"><div class="np-art-hint">Open</div></div>
       <div class="np-info">
         <div id="np-source" class="np-source">Receiver</div>
         <div id="np-title" class="np-title">Nothing playing</div>
@@ -25,7 +25,7 @@
       </div>
       <div class="np-controls" data-row="2">
         <button class="ctl focusable" data-act="back" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
-        <button class="ctl ctl-main focusable" data-act="toggle" aria-label="Play or pause"><svg id="ic-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><svg id="ic-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+        <button class="ctl ctl-main focusable" data-act="toggle" aria-label="Play or pause"><svg class="ic-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><svg class="ic-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
         <button class="ctl focusable" data-act="skip" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
         <div class="vol">
           <button class="ctl ctl-sm focusable" data-act="voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
@@ -56,6 +56,36 @@
       <div class="item focusable" data-set="close"><span>Done</span></div>
       <div id="diag" class="diag"></div>
     </div>
+  </div>
+
+  <div id="fs" class="fs hidden">
+    <div id="fs-bg" class="fs-bg"></div>
+    <div class="fs-shade"></div>
+    <div class="fs-top">
+      <span id="fs-source" class="eyebrow">Now playing</span>
+      <span id="fs-clock" class="fs-clock"></span>
+    </div>
+    <div class="fs-main">
+      <div id="fs-art" class="fs-art"></div>
+      <div class="fs-info">
+        <div id="fs-title" class="fs-title">Nothing playing</div>
+        <div id="fs-artist" class="fs-artist"></div>
+        <div id="fs-album" class="fs-album"></div>
+        <div class="fs-progress"><div id="fs-bar" class="fs-bar"></div></div>
+        <div class="fs-times"><span id="fs-pos">0:00</span><span id="fs-len"></span></div>
+        <div class="fs-controls">
+          <button class="ctl focusable" data-act="back" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+          <button class="ctl ctl-main focusable" data-act="toggle" aria-label="Play or pause"><svg class="ic-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><svg class="ic-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+          <button class="ctl focusable" data-act="skip" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+          <div class="vol">
+            <button class="ctl ctl-sm focusable" data-act="voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
+            <div id="fs-vol" class="vol-num">--</div>
+            <button class="ctl ctl-sm focusable" data-act="volup" aria-label="Volume up"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="fs-hint">Back to close</div>
   </div>
 
   <div id="toast" class="toast"></div>
