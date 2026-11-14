@@ -31,7 +31,7 @@
   var cfg = loadConfig();
   var installed = {};        // id -> true / false (unknown ids stay undefined)
   var extraApps = [];        // from tizen.application.getAppsInfo, if allowed
-  var diag = { tizen: typeof tizen !== 'undefined', appsInfo: 'not tried', launch: 'not used yet' };
+  var diag = { tizen: typeof tizen !== 'undefined', appsInfo: 'not tried', launch: 'not used yet', service: 'checking…' };
 
   // ---------- Helpers ----------
   function $(id) { return document.getElementById(id); }
@@ -104,9 +104,23 @@
     focus.refresh();
   }
 
+  var SERVICE = 'http://127.0.0.1:8095';
   function launchApp(id) {
     var a = appById(id);
     toast('Opening ' + a.name + '…');
+    // 1) Our TizenBrew background service (has the TV's tizen API). 2) tizen in-page. 3) TV REST API.
+    fetch(SERVICE + '/launch?id=' + encodeURIComponent(id))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.error || 'service error');
+        diag.launch = 'service';
+      })
+      .catch(function (e) {
+        diag.launch = 'service failed (' + errText(e) + ')';
+        launchFallback(id);
+      });
+  }
+  function launchFallback(id) {
     if (diag.tizen && tizen.application && tizen.application.launch) {
       try {
         tizen.application.launch(id, function () { diag.launch = 'tizen.application.launch'; },
@@ -120,9 +134,9 @@
     fetch('http://' + TV_HOST + ':8001/api/v2/applications/' + encodeURIComponent(id), { method: 'POST' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
-        if (diag.launch.indexOf('REST') < 0) diag.launch = 'REST API';
+        diag.launch += ' → REST API';
       })
-      .catch(function (e) { toast('Could not open app: ' + errText(e)); });
+      .catch(function (e) { toast('Could not open app: ' + errText(e)); diag.launch += ' → REST failed (' + errText(e) + ')'; });
   }
 
   function checkInstalled() {
@@ -317,7 +331,7 @@
     setText('v-units', cfg.units === 'C' ? '°C' : '°F');
     setVal('in-zip', cfg.weather ? cfg.weather.zip : '');
     setVal('in-amp', cfg.amp);
-    setText('diag',  'tizen API: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
+    setText('diag',  'service: ' + diag.service + '\ntizen in page: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
       '\nlast launch: ' + diag.launch + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
     if (settingsOpen) focus.refresh();
   }
@@ -463,6 +477,9 @@
   });
 
   // ---------- Start ----------
+  fetch(SERVICE + '/ping').then(function (r) { return r.json(); })
+    .then(function (d) { diag.service = d.ok ? 'running (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error'; })
+    .catch(function () { diag.service = 'not running'; });
   tickClock();
   setInterval(tickClock, 5000);
   renderApps();
