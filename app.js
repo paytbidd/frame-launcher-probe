@@ -154,7 +154,7 @@
     81: ['Showers', 'rain'], 82: ['Heavy showers', 'rain'], 85: ['Snow showers', 'snow'], 86: ['Snow showers', 'snow'],
     95: ['Thunderstorm', 'storm'], 96: ['Thunderstorm', 'storm'], 99: ['Thunderstorm', 'storm']
   };
-  var S = 'fill="none" stroke="#f4f5f7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
+  var S = 'fill="none" stroke="#45C3C0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
   var CLOUD = '<path ' + S + ' d="M17.5 19H8a5 5 0 1 1 1.1-9.9A6 6 0 0 1 20.5 12 3.6 3.6 0 0 1 17.5 19z"/>';
   var ICONS = {
     sun: '<circle ' + S + ' cx="16" cy="16" r="5.5"/><path ' + S + ' d="M16 3v3M16 26v3M3 16h3M26 16h3M6.8 6.8l2.1 2.1M23.1 23.1l2.1 2.1M6.8 25.2l2.1-2.1M23.1 8.9l2.1-2.1"/>',
