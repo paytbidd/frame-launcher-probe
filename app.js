@@ -35,6 +35,9 @@
 
   // ---------- Helpers ----------
   function $(id) { return document.getElementById(id); }
+  // Tolerate missing elements so a markup/script mismatch can't break the whole page.
+  function setText(id, v) { var el = $(id); if (el) el.textContent = v; }
+  function setVal(id, v) { var el = $(id); if (el) el.value = v; }
   function parseQuery() {
     var out = {}, q = location.search.replace(/^\?/, '').split('&');
     for (var i = 0; i < q.length; i++) {
@@ -212,7 +215,7 @@
       .then(function (pt) {
         cfg.weather = { zip: zip, place: place.name, hourly: pt.properties.forecastHourly, daily: pt.properties.forecast };
         saveConfig();
-        $('in-zip').value = zip;
+        setVal('in-zip', zip);
         toast('Weather set to ' + place.name);
         loadWeather();
       })
@@ -311,11 +314,11 @@
       el.firstChild.textContent = a.name;
       box.appendChild(el);
     });
-    $('v-units').textContent = cfg.units === 'C' ? '°C' : '°F';
-    $('in-zip').value = cfg.weather ? cfg.weather.zip : '';
-    $('in-amp').value = cfg.amp;
-    $('diag').textContent = 'tizen API: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
-      '\nlast launch: ' + diag.launch + '\npage: ' + location.href;
+    setText('v-units', cfg.units === 'C' ? '°C' : '°F');
+    setVal('in-zip', cfg.weather ? cfg.weather.zip : '');
+    setVal('in-amp', cfg.amp);
+    setText('diag',  'tizen API: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
+      '\nlast launch: ' + diag.launch + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
     if (settingsOpen) focus.refresh();
   }
 

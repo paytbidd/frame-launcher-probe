@@ -1,0 +1,59 @@
+  <header class="top">
+    <div class="clock">
+      <div id="time" class="time">--:--</div>
+      <div id="date" class="date"></div>
+    </div>
+    <div id="weather" class="weather">
+      <div id="wx-icon" class="wx-icon"></div>
+      <div class="wx-text">
+        <div id="wx-temp" class="wx-temp">--°</div>
+        <div id="wx-desc" class="wx-desc">Press Blue to set your ZIP code</div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="apps" class="apps" data-row="1"></section>
+
+    <section id="player" class="player">
+      <div id="np-art" class="np-art"></div>
+      <div class="np-info">
+        <div id="np-source" class="np-source">Receiver</div>
+        <div id="np-title" class="np-title">Nothing playing</div>
+        <div id="np-artist" class="np-artist"></div>
+        <div class="np-progress"><div id="np-bar" class="np-bar"></div></div>
+      </div>
+      <div class="np-controls" data-row="2">
+        <button class="ctl focusable" data-act="back" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="ctl ctl-main focusable" data-act="toggle" aria-label="Play or pause"><svg id="ic-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><svg id="ic-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+        <button class="ctl focusable" data-act="skip" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+        <div class="vol">
+          <button class="ctl ctl-sm focusable" data-act="voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
+          <div id="np-vol" class="vol-num">--</div>
+          <button class="ctl ctl-sm focusable" data-act="volup" aria-label="Volume up"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="hints">
+    <span><i class="dot blue"></i>Settings</span>
+    <span><i class="dot yellow"></i>Play / pause</span>
+  </footer>
+
+  <div id="settings" class="settings hidden">
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="sect">Home screen apps</div>
+      <div id="set-apps"></div>
+      <div class="sect">Weather</div>
+      <div class="item focusable" data-set="zip"><span>ZIP code</span><input id="in-zip" type="text" inputmode="numeric" maxlength="5" placeholder="e.g. 97124"></div>
+      <div class="item focusable" data-set="units"><span>Units</span><b id="v-units"></b></div>
+      <div class="sect">Receiver</div>
+      <div class="item focusable" data-set="amp"><span>BluOS address</span><input id="in-amp" type="text" placeholder="192.168.1.x"></div>
+      <div class="item focusable" data-set="close"><span>Done</span></div>
+      <div id="diag" class="diag"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
