@@ -23,11 +23,16 @@ function run(ref) {
       if (ref !== 'main') return run('main');      // last resort: the branch copy
       return console.error('frame-launcher: could not load service', err);
     }
-    var sandbox = {
-      require: require, tizen: typeof tizen !== 'undefined' ? tizen : undefined, console: console,
-      setTimeout: setTimeout, clearTimeout: clearTimeout, setInterval: setInterval, clearInterval: clearInterval,
-      Buffer: Buffer, process: process, SERVICE_VERSION: ref
-    };
+    var sandbox = { require: require, SERVICE_VERSION: ref };
+    // Pass along whichever of these globals exist in this sandbox.
+    if (typeof tizen !== 'undefined') sandbox.tizen = tizen;
+    if (typeof console !== 'undefined') sandbox.console = console;
+    if (typeof setTimeout !== 'undefined') sandbox.setTimeout = setTimeout;
+    if (typeof clearTimeout !== 'undefined') sandbox.clearTimeout = clearTimeout;
+    if (typeof setInterval !== 'undefined') sandbox.setInterval = setInterval;
+    if (typeof clearInterval !== 'undefined') sandbox.clearInterval = clearInterval;
+    if (typeof Buffer !== 'undefined') sandbox.Buffer = Buffer;
+    if (typeof process !== 'undefined') sandbox.process = process;
     try { vm.runInContext(code, vm.createContext(sandbox)); }
     catch (e) { console.error('frame-launcher: service crashed', e); }
   });
