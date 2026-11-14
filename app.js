@@ -10,15 +10,15 @@
 
   // Known Samsung app IDs. Only installed ones are offered in settings.
   var CATALOG = [
-    { id: '111299001912', name: 'YouTube', color: '#ff2a2a' },
-    { id: '3201907018807', name: 'Netflix', color: '#e50914' },
-    { id: '3201601007625', name: 'Hulu', color: '#1ce783' },
-    { id: '3201807016597', name: 'Apple TV', color: '#8e8e93' },
-    { id: '3201910019365', name: 'Prime Video', color: '#1f9cff' },
-    { id: '3201901017640', name: 'Disney+', color: '#3d6bff' },
-    { id: '3201606009684', name: 'Spotify', color: '#1ed760' },
-    { id: 'tCyZuSsCVw.Britbox', name: 'BritBox', color: '#c8a2ff' },
-    { id: '3201907018784', name: 'Internet', color: '#5ac8fa' }
+    { id: '111299001912', name: 'YouTube', color: '#ff2a2a', icon: 'icons/youtube.png' },
+    { id: '3201907018807', name: 'Netflix', color: '#e50914', icon: 'icons/netflix.png' },
+    { id: '3201601007625', name: 'Hulu', color: '#1ce783', icon: 'icons/hulu.png' },
+    { id: '3201807016597', name: 'Apple TV', color: '#8e8e93', icon: 'icons/appletv.png' },
+    { id: '3201910019365', name: 'Prime Video', color: '#1f9cff', icon: 'icons/primevideo.png' },
+    { id: '3201901017640', name: 'Disney+', color: '#3d6bff', icon: 'icons/disneyplus.png' },
+    { id: '3201606009684', name: 'Spotify', color: '#1ed760', icon: 'icons/spotify.png' },
+    { id: 'tCyZuSsCVw.Britbox', name: 'BritBox', color: '#c8a2ff', icon: 'icons/britbox.png' },
+    { id: '3201907018784', name: 'Internet', color: '#5ac8fa', icon: 'icons/internet.svg' }
   ];
 
   var DEFAULTS = {
@@ -88,8 +88,9 @@
       el.className = 'tile focusable';
       el.setAttribute('data-app', a.id);
       el.style.setProperty('--c', a.color || '#666');
-      el.innerHTML = '<div class="name"></div>';
-      el.firstChild.textContent = a.name;
+      el.innerHTML = (a.icon ? '<img class="icon" alt="">' : '<div class="icon blank"></div>') + '<div class="name"></div>';
+      if (a.icon) el.firstChild.src = a.icon;
+      el.lastChild.textContent = a.name;
       box.appendChild(el);
     }
     var add = document.createElement('div');
@@ -362,6 +363,13 @@
       if (el) {
         el.classList.add('focused');
         if (settingsOpen && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+        var box = el.parentNode;
+        if (box && box.id === 'apps') {
+          // Keep the focused tile inside the 120px side margins, scrolling the row as needed.
+          var left = el.offsetLeft - 120, right = el.offsetLeft + el.offsetWidth + 120 - box.clientWidth;
+          if (box.scrollLeft > left) box.scrollLeft = left;
+          else if (box.scrollLeft < right) box.scrollLeft = right;
+        }
       }
     }
     function current() {
