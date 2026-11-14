@@ -25,6 +25,7 @@
     apps: ['111299001912', '3201907018807', '3201601007625'],
     weather: null,           // { zip, place, hourly, daily } — NWS forecast URLs
     units: 'F',
+    returnHome: true,        // reopen the launcher when an app it opened is closed
     amp: '192.168.1.159'
   };
 
@@ -105,11 +106,18 @@
   }
 
   var SERVICE = 'http://127.0.0.1:8095';
+  // TizenBrew serves this page at /module/<module name, URL-encoded>/index.html
+  function moduleName() {
+    var m = location.pathname.match(/\/module\/([^\/]+)\//);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
   function launchApp(id) {
     var a = appById(id);
     toast('Opening ' + a.name + '…');
     // 1) Our TizenBrew background service (has the TV's tizen API). 2) tizen in-page. 3) TV REST API.
-    fetch(SERVICE + '/launch?id=' + encodeURIComponent(id))
+    var mod = moduleName();
+    var q = '/launch?id=' + encodeURIComponent(id) + (cfg.returnHome && mod ? '&ret=1&mod=' + encodeURIComponent(mod) : '');
+    fetch(SERVICE + q)
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) throw new Error(d.error || 'service error');
@@ -315,6 +323,17 @@
   }
 
   // ---------- Settings ----------
+  function pingService(after) {
+    fetch(SERVICE + '/ping').then(function (r) { return r.json(); })
+      .then(function (d) {
+        diag.service = d.ok ? 'running ' + String(d.version).slice(0, 7) + ' (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error';
+        diag.watch = (d.watching && d.watching.length ? 'watching ' + d.watching.join(', ') : 'idle') +
+          (d.events && d.events.length ? '\n  ' + d.events.join('\n  ') : '');
+      })
+      .catch(function () { diag.service = 'not running'; diag.watch = ''; })
+      .then(function () { if (after) after(); });
+  }
+
   function renderSettingsApps() {
     var box = $('set-apps');
     box.innerHTML = '';
@@ -329,10 +348,13 @@
       box.appendChild(el);
     });
     setText('v-units', cfg.units === 'C' ? '°C' : '°F');
+    setText('v-return', cfg.returnHome ? 'On' : 'Off');
+    var ri = document.querySelector('[data-set="return"]');
+    if (ri) ri.className = 'item focusable' + (cfg.returnHome ? ' on' : '') + (ri.classList.contains('focused') ? ' focused' : '');
     setVal('in-zip', cfg.weather ? cfg.weather.zip : '');
     setVal('in-amp', cfg.amp);
     setText('diag',  'service: ' + diag.service + '\ntizen in page: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
-      '\nlast launch: ' + diag.launch + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
+      '\nlast launch: ' + diag.launch + '\nreturn watcher: ' + (diag.watch || '—') + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
     if (settingsOpen) focus.refresh();
   }
 
@@ -340,6 +362,7 @@
   function openSettings() {
     settingsOpen = true;
     renderSettingsApps();
+    pingService(function () { if (settingsOpen) renderSettingsApps(); });
     $('settings').className = 'settings';
     focus.refresh(0);
   }
@@ -360,7 +383,8 @@
       return;
     }
     var s = el.getAttribute('data-set');
-    if (s === 'units') { cfg.units = cfg.units === 'C' ? 'F' : 'C'; saveConfig(); renderSettingsApps(); loadWeather(); }
+    if (s === 'return') { cfg.returnHome = !cfg.returnHome; saveConfig(); renderSettingsApps(); }
+    else if (s === 'units') { cfg.units = cfg.units === 'C' ? 'F' : 'C'; saveConfig(); renderSettingsApps(); loadWeather(); }
     else if (s === 'close') closeSettings();
     else if (s === 'zip' || s === 'amp') { var inp = el.getElementsByTagName('input')[0]; inp.focus(); inp.select(); }
   }
@@ -477,9 +501,7 @@
   });
 
   // ---------- Start ----------
-  fetch(SERVICE + '/ping').then(function (r) { return r.json(); })
-    .then(function (d) { diag.service = d.ok ? 'running ' + String(d.version).slice(0, 7) + ' (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error'; })
-    .catch(function () { diag.service = 'not running'; });
+  pingService();
   tickClock();
   setInterval(tickClock, 5000);
   renderApps();
