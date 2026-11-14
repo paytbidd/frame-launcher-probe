@@ -478,7 +478,7 @@
 
   // ---------- Start ----------
   fetch(SERVICE + '/ping').then(function (r) { return r.json(); })
-    .then(function (d) { diag.service = d.ok ? 'running (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error'; })
+    .then(function (d) { diag.service = d.ok ? 'running ' + String(d.version).slice(0, 7) + ' (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error'; })
     .catch(function () { diag.service = 'not running'; });
   tickClock();
   setInterval(tickClock, 5000);

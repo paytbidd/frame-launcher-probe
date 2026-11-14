@@ -1,7 +1,7 @@
 {
   "name": "frame-launcher",
   "appName": "Frame Launcher",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A clean home screen for Samsung Tizen TVs: app tiles, weather, and BluOS now-playing controls.",
   "packageType": "app",
   "appPath": "index.html",
@@ -15,7 +15,22 @@
     "MediaPause",
     "MediaStop",
     "MediaTrackNext",
-    "MediaTrackPrevious"
+    "MediaTrackPrevious",
+    "MediaRewind",
+    "MediaFastForward",
+    "ChannelUp",
+    "ChannelDown",
+    "Info",
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9"
   ],
   "license": "MIT",
   "serviceFile": "service.js"

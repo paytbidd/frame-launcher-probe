@@ -1,63 +1,43 @@
-// Frame Launcher background service. TizenBrew runs this inside its own service
-// (old Node.js, with the TV's `tizen` API), which can launch apps the web page can't.
-// The page talks to it over http://127.0.0.1:8095. Keep this file small and stable:
-// TizenBrew loads it from the pinned commit, so changes here need a new module link.
-var http = require('http');
-var url = require('url');
-var PORT = 8095;
+// Frame Launcher service starter. TizenBrew runs this file from the pinned module commit,
+// so it must stay tiny and stable. It looks up the newest commit on GitHub, downloads
+// service-main.js from that commit and runs it with the same tools (require, tizen),
+// so the real service updates without changing the module link. Old Node.js: ES5 only.
+var https = require('https');
+var vm = require('vm');
+var REPO = 'paytbidd/frame-launcher-probe';
 
-function send(res, code, body) {
-  res.writeHead(code, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Cache-Control': 'no-store'
+function get(opts, cb) {
+  var req = https.get(opts, function (res) {
+    var body = '';
+    res.setEncoding('utf8');
+    res.on('data', function (c) { body += c; });
+    res.on('end', function () { cb(res.statusCode === 200 ? null : new Error('HTTP ' + res.statusCode), body); });
   });
-  res.end(JSON.stringify(body));
+  req.on('error', function (e) { cb(e); });
+  req.setTimeout(10000, function () { req.abort(); });
 }
 
-function errText(e) {
-  return e ? (e.name ? e.name + ': ' : '') + (e.message || String(e)) : 'unknown error';
+function run(ref) {
+  get('https://cdn.jsdelivr.net/gh/' + REPO + '@' + ref + '/service-main.js', function (err, code) {
+    if (err) {
+      if (ref !== 'main') return run('main');      // last resort: the branch copy
+      return console.error('frame-launcher: could not load service', err);
+    }
+    var sandbox = {
+      require: require, tizen: typeof tizen !== 'undefined' ? tizen : undefined, console: console,
+      setTimeout: setTimeout, clearTimeout: clearTimeout, setInterval: setInterval, clearInterval: clearInterval,
+      Buffer: Buffer, process: process, SERVICE_VERSION: ref
+    };
+    try { vm.runInContext(code, vm.createContext(sandbox)); }
+    catch (e) { console.error('frame-launcher: service crashed', e); }
+  });
 }
 
-var server = http.createServer(function (req, res) {
-  var u = url.parse(req.url, true);
-  var hasTizen = typeof tizen !== 'undefined' && !!tizen.application;
-
-  if (u.pathname === '/ping') return send(res, 200, { ok: true, tizen: hasTizen, version: 1 });
-  if (!hasTizen) return send(res, 500, { ok: false, error: 'tizen API not available in service' });
-
-  if (u.pathname === '/launch') {
-    var id = u.query.id;
-    if (!id) return send(res, 400, { ok: false, error: 'missing id' });
-    try {
-      tizen.application.launch(id,
-        function () { send(res, 200, { ok: true, id: id }); },
-        function (e) { send(res, 500, { ok: false, error: errText(e) }); });
-    } catch (e) {
-      send(res, 500, { ok: false, error: errText(e) });
-    }
-    return;
-  }
-
-  if (u.pathname === '/apps') {
-    try {
-      tizen.application.getAppsInfo(function (list) {
-        send(res, 200, {
-          ok: true,
-          apps: list.map(function (a) { return { id: a.id, name: a.name, show: a.show }; })
-        });
-      }, function (e) { send(res, 500, { ok: false, error: errText(e) }); });
-    } catch (e) {
-      send(res, 500, { ok: false, error: errText(e) });
-    }
-    return;
-  }
-
-  send(res, 404, { ok: false, error: 'not found' });
+get({
+  hostname: 'api.github.com',
+  path: '/repos/' + REPO + '/commits/main',
+  headers: { 'User-Agent': 'frame-launcher', Accept: 'application/vnd.github.sha' }
+}, function (err, sha) {
+  sha = (sha || '').trim();
+  run(!err && /^[0-9a-f]{40}$/.test(sha) ? sha : 'main');
 });
-
-server.on('error', function (e) {
-  // EADDRINUSE means a copy of this service is already running; that one will answer.
-  if (e.code !== 'EADDRINUSE') console.error('frame-launcher service error', e);
-});
-server.listen(PORT, '127.0.0.1');
