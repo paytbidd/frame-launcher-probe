@@ -500,8 +500,37 @@
     ev.preventDefault();
   });
 
+  // ---------- Self-update ----------
+  // The loader only waits 4s for GitHub, then opens the version it remembers. If a newer
+  // commit exists, reload once so the TV doesn't stay a version behind.
+  function checkForUpdate() {
+    var b = document.querySelector('base');
+    var m = b && b.href.match(/@([0-9a-f]{40})\//);
+    if (!m) return;                                   // local dev or branch copy
+    var current = m[1];
+    fetch('https://api.github.com/repos/paytbidd/frame-launcher-probe/commits/main',
+      { headers: { Accept: 'application/vnd.github.sha' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+      .then(function (sha) {
+        sha = sha.trim();
+        if (!/^[0-9a-f]{40}$/.test(sha) || sha === current) return;
+        var tried = null;
+        try { tried = sessionStorage.getItem('frameLauncher.reloadedFor'); } catch (e) {}
+        if (tried === sha) return;                    // already reloaded once for this version
+        try {
+          sessionStorage.setItem('frameLauncher.reloadedFor', sha);
+          localStorage.setItem('frameLauncher.sha', sha);
+        } catch (e) {}
+        toast('Updating launcher…');
+        setTimeout(function () { location.reload(); }, 800);
+      })
+      .catch(function () { /* offline or rate-limited: keep running this version */ });
+  }
+
   // ---------- Start ----------
   pingService();
+  setTimeout(checkForUpdate, 3000);
+  setInterval(checkForUpdate, 6 * 60 * 60 * 1000);   // launcher may stay open for days
   tickClock();
   setInterval(tickClock, 5000);
   renderApps();
