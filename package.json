@@ -1,10 +1,14 @@
 {
-  "name": "frame-launcher-probe",
-  "appName": "Launcher Probe",
-  "version": "0.1.0",
-  "description": "Checks which Tizen APIs a TizenBrew app module can use (listing and launching apps).",
+  "name": "frame-launcher",
+  "appName": "Frame Launcher",
+  "version": "0.2.0",
+  "description": "A clean home screen for Samsung Tizen TVs: app tiles, weather, and BluOS now-playing controls.",
   "packageType": "app",
   "appPath": "index.html",
-  "keys": ["ColorF0Red", "ColorF1Green", "ColorF2Yellow", "ColorF3Blue"],
+  "keys": [
+    "ColorF0Red", "ColorF1Green", "ColorF2Yellow", "ColorF3Blue",
+    "MediaPlayPause", "MediaPlay", "MediaPause", "MediaStop",
+    "MediaTrackNext", "MediaTrackPrevious"
+  ],
   "license": "MIT"
 }

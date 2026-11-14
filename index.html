@@ -2,116 +2,70 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Launcher Probe</title>
-<style>
-  html, body { margin: 0; background: #111; color: #eee; font: 22px/1.4 sans-serif; }
-  body { padding: 40px 60px; }
-  h1 { margin: 0 0 16px; font-size: 34px; }
-  .row { margin: 4px 0; }
-  .ok { color: #6d6; } .bad { color: #f77; } .dim { color: #888; }
-  #apps { margin-top: 20px; columns: 3; column-gap: 40px; font-size: 18px; }
-  .app { padding: 4px 10px; border-radius: 6px; break-inside: avoid; }
-  .app.sel { background: #2a6df4; color: #fff; }
-  #log { margin-top: 16px; font-size: 18px; color: #fc6; white-space: pre-wrap; }
-</style>
+<meta name="viewport" content="width=1920, height=1080">
+<title>Frame Launcher</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1>Launcher Probe</h1>
-<div id="checks"></div>
-<div class="dim row">Arrows: move &middot; Enter: launch selected app &middot; Red: reload list &middot; Back: return to TizenBrew</div>
-<div id="log"></div>
-<div id="apps"></div>
-<script>
-(function () {
-  var checks = document.getElementById('checks');
-  var logEl = document.getElementById('log');
-  var appsEl = document.getElementById('apps');
-  var apps = [];
-  var sel = 0;
+  <header class="top">
+    <div class="clock">
+      <div id="time" class="time">--:--</div>
+      <div id="date" class="date"></div>
+    </div>
+    <div id="weather" class="weather">
+      <div id="wx-icon" class="wx-icon"></div>
+      <div class="wx-text">
+        <div id="wx-temp" class="wx-temp">--°</div>
+        <div id="wx-desc" class="wx-desc">Set a location in settings</div>
+      </div>
+    </div>
+  </header>
 
-  function row(label, ok, detail) {
-    var d = document.createElement('div');
-    d.className = 'row';
-    d.innerHTML = '<span class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? '✔' : '✘') + '</span> ' +
-      label + (detail ? ' <span class="dim">— ' + String(detail).replace(/</g, '&lt;') + '</span>' : '');
-    checks.appendChild(d);
-  }
-  function log(msg) { logEl.textContent = msg; }
-  function errText(e) { return e ? (e.name ? e.name + ': ' : '') + (e.message || e) : 'unknown'; }
+  <main>
+    <section id="apps" class="apps" data-row="1"></section>
 
-  row('Page location', true, location.href);
+    <section id="player" class="player">
+      <div id="np-art" class="np-art"></div>
+      <div class="np-info">
+        <div id="np-source" class="np-source">Receiver</div>
+        <div id="np-title" class="np-title">Nothing playing</div>
+        <div id="np-artist" class="np-artist"></div>
+        <div class="np-progress"><div id="np-bar" class="np-bar"></div></div>
+      </div>
+      <div class="np-controls" data-row="2">
+        <button class="ctl focusable" data-act="back" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+        <button class="ctl ctl-main focusable" data-act="toggle" aria-label="Play or pause"><svg id="ic-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg><svg id="ic-pause" viewBox="0 0 24 24" style="display:none"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+        <button class="ctl focusable" data-act="skip" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+        <div class="vol">
+          <button class="ctl ctl-sm focusable" data-act="voldown" aria-label="Volume down"><svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg></button>
+          <div id="np-vol" class="vol-num">--</div>
+          <button class="ctl ctl-sm focusable" data-act="volup" aria-label="Volume up"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg></button>
+        </div>
+      </div>
+    </section>
+  </main>
 
-  var hasTizen = typeof tizen !== 'undefined';
-  row('tizen object', hasTizen, hasTizen ? 'present' : 'undefined');
-  row('webapis object', typeof webapis !== 'undefined');
+  <footer class="hints">
+    <span><i class="dot blue"></i>Settings</span>
+    <span><i class="dot yellow"></i>Play / pause</span>
+  </footer>
 
-  if (hasTizen) {
-    try {
-      var cur = tizen.application.getCurrentApplication().appInfo;
-      row('Current app', true, cur.id);
-    } catch (e) { row('Current app', false, errText(e)); }
+  <div id="settings" class="settings hidden">
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="sect">Home screen apps</div>
+      <div id="set-apps"></div>
+      <div class="sect">Weather</div>
+      <div class="item focusable" data-set="city"><span>Location</span><input id="in-city" type="text" placeholder="City name"></div>
+      <div class="item focusable" data-set="units"><span>Units</span><b id="v-units"></b></div>
+      <div class="sect">Receiver</div>
+      <div class="item focusable" data-set="amp"><span>BluOS address</span><input id="in-amp" type="text" placeholder="192.168.1.x"></div>
+      <div class="item focusable" data-set="close"><span>Done</span></div>
+      <div id="diag" class="diag"></div>
+    </div>
+  </div>
 
-    try {
-      tizen.tvinputdevice.registerKey('ColorF0Red');
-      row('registerKey(ColorF0Red)', true);
-    } catch (e) { row('registerKey(ColorF0Red)', false, errText(e)); }
-
-    loadApps();
-  }
-
-  function loadApps() {
-    try {
-      tizen.application.getAppsInfo(function (list) {
-        apps = list.filter(function (a) { return a.show !== false; })
-                   .sort(function (a, b) { return a.name.localeCompare(b.name); });
-        row('getAppsInfo', true, list.length + ' apps, ' + apps.length + ' visible');
-        sel = 0;
-        render();
-      }, function (e) {
-        row('getAppsInfo', false, errText(e));
-      });
-    } catch (e) { row('getAppsInfo', false, errText(e)); }
-  }
-
-  function render() {
-    appsEl.innerHTML = '';
-    for (var i = 0; i < apps.length; i++) {
-      var d = document.createElement('div');
-      d.className = 'app' + (i === sel ? ' sel' : '');
-      d.textContent = apps[i].name + '  (' + apps[i].id + ')';
-      appsEl.appendChild(d);
-    }
-    var s = appsEl.children[sel];
-    if (s && s.scrollIntoView) s.scrollIntoView(false);
-  }
-
-  function launch(app) {
-    log('Launching ' + app.name + ' …');
-    try {
-      tizen.application.launch(app.id, function () {
-        log('launch() succeeded for ' + app.id);
-      }, function (e) {
-        log('launch() failed for ' + app.id + ': ' + errText(e));
-      });
-    } catch (e) { log('launch() threw: ' + errText(e)); }
-  }
-
-  document.addEventListener('keydown', function (ev) {
-    var k = ev.keyCode;
-    if (k === 10009) { history.back(); return; }          // Back / Return
-    if (k === 403) { checks.innerHTML = ''; loadApps(); return; } // Red
-    if (!apps.length) return;
-    var perCol = Math.ceil(apps.length / 3);
-    if (k === 40) sel = Math.min(apps.length - 1, sel + 1);        // Down
-    else if (k === 38) sel = Math.max(0, sel - 1);                 // Up
-    else if (k === 39) sel = Math.min(apps.length - 1, sel + perCol); // Right
-    else if (k === 37) sel = Math.max(0, sel - perCol);            // Left
-    else if (k === 13) { launch(apps[sel]); return; }              // Enter
-    else return;
-    ev.preventDefault();
-    render();
-  });
-})();
-</script>
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
 </body>
 </html>
