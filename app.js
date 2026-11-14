@@ -23,7 +23,7 @@
 
   var DEFAULTS = {
     apps: ['111299001912', '3201907018807', '3201601007625'],
-    city: null,              // { name, lat, lon }
+    weather: null,           // { zip, place, hourly, daily } — NWS forecast URLs
     units: 'F',
     amp: '192.168.1.159'
   };
@@ -145,16 +145,7 @@
     } else diag.appsInfo = 'unavailable';
   }
 
-  // ---------- Weather (Open-Meteo, no API key) ----------
-  var WX = {
-    0: ['Clear', 'sun'], 1: ['Mostly clear', 'sun'], 2: ['Partly cloudy', 'partly'], 3: ['Overcast', 'cloud'],
-    45: ['Fog', 'fog'], 48: ['Fog', 'fog'], 51: ['Light drizzle', 'rain'], 53: ['Drizzle', 'rain'], 55: ['Drizzle', 'rain'],
-    56: ['Freezing drizzle', 'rain'], 57: ['Freezing drizzle', 'rain'], 61: ['Light rain', 'rain'], 63: ['Rain', 'rain'],
-    65: ['Heavy rain', 'rain'], 66: ['Freezing rain', 'rain'], 67: ['Freezing rain', 'rain'], 71: ['Light snow', 'snow'],
-    73: ['Snow', 'snow'], 75: ['Heavy snow', 'snow'], 77: ['Snow grains', 'snow'], 80: ['Showers', 'rain'],
-    81: ['Showers', 'rain'], 82: ['Heavy showers', 'rain'], 85: ['Snow showers', 'snow'], 86: ['Snow showers', 'snow'],
-    95: ['Thunderstorm', 'storm'], 96: ['Thunderstorm', 'storm'], 99: ['Thunderstorm', 'storm']
-  };
+  // ---------- Weather (US: ZIP via zippopotam.us, forecast via National Weather Service; no keys) ----------
   var S = 'fill="none" stroke="#45C3C0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
   var CLOUD = '<path ' + S + ' d="M17.5 19H8a5 5 0 1 1 1.1-9.9A6 6 0 0 1 20.5 12 3.6 3.6 0 0 1 17.5 19z"/>';
   var ICONS = {
@@ -168,42 +159,64 @@
     storm: '<g transform="translate(2 -1)">' + CLOUD + '</g><path ' + S + ' d="M17 20l-3 5h4l-3 5"/>'
   };
 
+  function iconFor(text, isDay) {
+    var t = (text || '').toLowerCase();
+    if (/thunder|t-storm/.test(t)) return 'storm';
+    if (/snow|sleet|flurr|ice|wintry/.test(t)) return 'snow';
+    if (/rain|shower|drizzle/.test(t)) return 'rain';
+    if (/fog|haze|smoke|mist/.test(t)) return 'fog';
+    if (/partly|mostly sunny|mostly clear/.test(t)) return 'partly';
+    if (/cloud|overcast/.test(t)) return 'cloud';
+    return isDay ? 'sun' : 'moon';
+  }
+  function temp(f) { return Math.round(cfg.units === 'C' ? (f - 32) * 5 / 9 : f) + '°'; }
+  function getJSON(url) {
+    return fetch(url, { headers: { Accept: 'application/geo+json' } }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
   function loadWeather() {
-    if (!cfg.city) {
+    if (!cfg.weather) {
       $('wx-temp').textContent = '';
-      $('wx-desc').textContent = 'Press Blue to set your location';
+      $('wx-desc').textContent = 'Press Blue to set your ZIP code';
       $('wx-icon').innerHTML = '';
       return;
     }
-    var u = cfg.units === 'C' ? 'celsius' : 'fahrenheit';
-    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + cfg.city.lat + '&longitude=' + cfg.city.lon +
-      '&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min' +
-      '&temperature_unit=' + u + '&timezone=auto&forecast_days=1';
-    fetch(url).then(function (r) { return r.json(); }).then(function (d) {
-      var code = d.current.weather_code, w = WX[code] || ['—', 'cloud'];
-      var icon = w[1] === 'sun' && !d.current.is_day ? 'moon' : w[1];
-      $('wx-icon').innerHTML = '<svg viewBox="0 0 32 32">' + ICONS[icon] + '</svg>';
-      $('wx-temp').textContent = Math.round(d.current.temperature_2m) + '°';
-      $('wx-desc').textContent = w[0] + '  ·  H ' + Math.round(d.daily.temperature_2m_max[0]) + '°  L ' +
-        Math.round(d.daily.temperature_2m_min[0]) + '°  ·  ' + cfg.city.name;
+    Promise.all([getJSON(cfg.weather.hourly), getJSON(cfg.weather.daily)]).then(function (res) {
+      var now = res[0].properties.periods[0], days = res[1].properties.periods.slice(0, 3);
+      var hi = null, lo = null;
+      days.forEach(function (p) {
+        if (p.isDaytime && hi === null) hi = p.temperature;
+        if (!p.isDaytime && lo === null) lo = p.temperature;
+      });
+      $('wx-icon').innerHTML = '<svg viewBox="0 0 32 32">' + ICONS[iconFor(now.shortForecast, now.isDaytime)] + '</svg>';
+      $('wx-temp').textContent = temp(now.temperature);
+      $('wx-desc').textContent = now.shortForecast +
+        (hi !== null ? '  ·  H ' + temp(hi) : '') + (lo !== null ? '  L ' + temp(lo) : '') + '  ·  ' + cfg.weather.place;
     }).catch(function () { $('wx-desc').textContent = 'Weather unavailable'; });
   }
 
-  function setCity(text) {
-    text = (text || '').trim();
-    if (!text) return;
-    fetch('https://geocoding-api.open-meteo.com/v1/search?count=1&name=' + encodeURIComponent(text))
-      .then(function (r) { return r.json(); })
+  function setZip(text) {
+    var zip = (text || '').replace(/\D/g, '').slice(0, 5);
+    if (zip.length !== 5) { toast('Enter a 5-digit ZIP code'); return; }
+    var place;
+    fetch('https://api.zippopotam.us/us/' + zip)
+      .then(function (r) { if (!r.ok) throw new Error('unknown ZIP'); return r.json(); })
       .then(function (d) {
-        if (!d.results || !d.results.length) { toast('No place called "' + text + '"'); return; }
-        var p = d.results[0];
-        cfg.city = { name: p.name, lat: p.latitude, lon: p.longitude };
+        var p = d.places[0];
+        place = { name: p['place name'] + ', ' + p['state abbreviation'], lat: (+p.latitude).toFixed(4), lon: (+p.longitude).toFixed(4) };
+        return getJSON('https://api.weather.gov/points/' + place.lat + ',' + place.lon);
+      })
+      .then(function (pt) {
+        cfg.weather = { zip: zip, place: place.name, hourly: pt.properties.forecastHourly, daily: pt.properties.forecast };
         saveConfig();
-        $('in-city').value = p.name + (p.admin1 ? ', ' + p.admin1 : '');
-        toast('Weather set to ' + $('in-city').value);
+        $('in-zip').value = zip;
+        toast('Weather set to ' + place.name);
         loadWeather();
       })
-      .catch(function () { toast('Could not look up that place'); });
+      .catch(function (e) { toast('Couldn\'t find weather for ' + zip + (e && e.message === 'unknown ZIP' ? ' (unknown ZIP)' : '')); });
   }
 
   // ---------- Receiver (BluOS HTTP API, port 11000) ----------
@@ -299,7 +312,7 @@
       box.appendChild(el);
     });
     $('v-units').textContent = cfg.units === 'C' ? '°C' : '°F';
-    $('in-city').value = cfg.city ? cfg.city.name : '';
+    $('in-zip').value = cfg.weather ? cfg.weather.zip : '';
     $('in-amp').value = cfg.amp;
     $('diag').textContent = 'tizen API: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
       '\nlast launch: ' + diag.launch + '\npage: ' + location.href;
@@ -332,10 +345,10 @@
     var s = el.getAttribute('data-set');
     if (s === 'units') { cfg.units = cfg.units === 'C' ? 'F' : 'C'; saveConfig(); renderSettingsApps(); loadWeather(); }
     else if (s === 'close') closeSettings();
-    else if (s === 'city' || s === 'amp') { var inp = el.getElementsByTagName('input')[0]; inp.focus(); inp.select(); }
+    else if (s === 'zip' || s === 'amp') { var inp = el.getElementsByTagName('input')[0]; inp.focus(); inp.select(); }
   }
   function commitInput(inp) {
-    if (inp.id === 'in-city') setCity(inp.value);
+    if (inp.id === 'in-zip') setZip(inp.value);
     else if (inp.id === 'in-amp') {
       cfg.amp = inp.value.trim() || DEFAULTS.amp;
       saveConfig();
