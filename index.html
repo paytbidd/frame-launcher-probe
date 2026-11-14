@@ -15,6 +15,35 @@
    so it looks up the newest commit on GitHub and loads everything else pinned to that commit.
    Commit-pinned files never change, so old and new versions can't mix. */
 (function () {
+  // ---- Version badge (bottom right). Drawn by the loader so it shows even if app.js fails.
+  // The chip color is derived from the commit, so each version gets its own color.
+  var badge = document.createElement('div');
+  badge.style.cssText = 'position:fixed;right:40px;bottom:36px;z-index:99;display:flex;align-items:center;' +
+    'font:500 20px Figtree,SamsungOne,Arial,sans-serif;color:#9BB0BA;letter-spacing:0.5px;';
+  badge.innerHTML = '<span id="fl-chip" style="width:16px;height:16px;border-radius:5px;margin-right:10px;background:#2B414C"></span>' +
+    '<span id="fl-ver">loading…</span><span id="fl-key" style="margin-left:14px;opacity:.6"></span>';
+  document.documentElement.appendChild(badge);
+  function showVersion(label, sha) {
+    document.getElementById('fl-ver').textContent = label;
+    if (sha) document.getElementById('fl-chip').style.background = 'hsl(' + (parseInt(sha.slice(0, 6), 16) % 360) + ',70%,58%)';
+  }
+  function showError(msg) {
+    var v = document.getElementById('fl-ver');
+    v.textContent = 'error: ' + msg;
+    v.style.color = '#F08A66';
+    document.getElementById('fl-chip').style.background = '#F08A66';
+  }
+  window.addEventListener('error', function (e) {
+    showError((e.message || 'script error') + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : ''));
+  });
+  var keyTimer;
+  document.addEventListener('keydown', function (e) {
+    var k = document.getElementById('fl-key');
+    k.textContent = 'key ' + e.keyCode;
+    clearTimeout(keyTimer);
+    keyTimer = setTimeout(function () { k.textContent = ''; }, 1500);
+  }, true);
+
   var REPO = 'paytbidd/frame-launcher-probe';
   var SHA_KEY = 'frameLauncher.sha';
   var here = location.href.split('?')[0].replace(/[^\/]*$/, '');   // folder this page was served from
@@ -35,18 +64,21 @@
       document.body.innerHTML = html;
       var js = document.createElement('script');
       js.src = base + 'app.js';
+      js.onerror = function () { showError('app.js failed to load'); };
       document.body.appendChild(js);
-    }).catch(function () {
+    }).catch(function (e) {
+      showError('shell.html: ' + (e && e.message));
       if (fallback && fallback !== base) { b.parentNode.removeChild(b); css.parentNode.removeChild(css); start(fallback); }
     });
   }
 
-  if (local) { start(here); return; }   // developing on the Mac: use the files next to this page
+  if (local) { showVersion('dev'); start(here); return; }   // developing on the Mac: use the files next to this page
 
   var done = false;
   function go(sha) {
     if (done) return;
     done = true;
+    showVersion(sha ? sha.slice(0, 7) : 'branch copy', sha);
     start(sha ? 'https://cdn.jsdelivr.net/gh/' + REPO + '@' + sha + '/' : here, here);
   }
   var cached = null;
