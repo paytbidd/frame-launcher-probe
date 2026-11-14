@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Launcher Probe</title>
+<style>
+  html, body { margin: 0; background: #111; color: #eee; font: 22px/1.4 sans-serif; }
+  body { padding: 40px 60px; }
+  h1 { margin: 0 0 16px; font-size: 34px; }
+  .row { margin: 4px 0; }
+  .ok { color: #6d6; } .bad { color: #f77; } .dim { color: #888; }
+  #apps { margin-top: 20px; columns: 3; column-gap: 40px; font-size: 18px; }
+  .app { padding: 4px 10px; border-radius: 6px; break-inside: avoid; }
+  .app.sel { background: #2a6df4; color: #fff; }
+  #log { margin-top: 16px; font-size: 18px; color: #fc6; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Launcher Probe</h1>
+<div id="checks"></div>
+<div class="dim row">Arrows: move &middot; Enter: launch selected app &middot; Red: reload list &middot; Back: return to TizenBrew</div>
+<div id="log"></div>
+<div id="apps"></div>
+<script>
+(function () {
+  var checks = document.getElementById('checks');
+  var logEl = document.getElementById('log');
+  var appsEl = document.getElementById('apps');
+  var apps = [];
+  var sel = 0;
+
+  function row(label, ok, detail) {
+    var d = document.createElement('div');
+    d.className = 'row';
+    d.innerHTML = '<span class="' + (ok ? 'ok' : 'bad') + '">' + (ok ? '✔' : '✘') + '</span> ' +
+      label + (detail ? ' <span class="dim">— ' + String(detail).replace(/</g, '&lt;') + '</span>' : '');
+    checks.appendChild(d);
+  }
+  function log(msg) { logEl.textContent = msg; }
+  function errText(e) { return e ? (e.name ? e.name + ': ' : '') + (e.message || e) : 'unknown'; }
+
+  row('Page location', true, location.href);
+
+  var hasTizen = typeof tizen !== 'undefined';
+  row('tizen object', hasTizen, hasTizen ? 'present' : 'undefined');
+  row('webapis object', typeof webapis !== 'undefined');
+
+  if (hasTizen) {
+    try {
+      var cur = tizen.application.getCurrentApplication().appInfo;
+      row('Current app', true, cur.id);
+    } catch (e) { row('Current app', false, errText(e)); }
+
+    try {
+      tizen.tvinputdevice.registerKey('ColorF0Red');
+      row('registerKey(ColorF0Red)', true);
+    } catch (e) { row('registerKey(ColorF0Red)', false, errText(e)); }
+
+    loadApps();
+  }
+
+  function loadApps() {
+    try {
+      tizen.application.getAppsInfo(function (list) {
+        apps = list.filter(function (a) { return a.show !== false; })
+                   .sort(function (a, b) { return a.name.localeCompare(b.name); });
+        row('getAppsInfo', true, list.length + ' apps, ' + apps.length + ' visible');
+        sel = 0;
+        render();
+      }, function (e) {
+        row('getAppsInfo', false, errText(e));
+      });
+    } catch (e) { row('getAppsInfo', false, errText(e)); }
+  }
+
+  function render() {
+    appsEl.innerHTML = '';
+    for (var i = 0; i < apps.length; i++) {
+      var d = document.createElement('div');
+      d.className = 'app' + (i === sel ? ' sel' : '');
+      d.textContent = apps[i].name + '  (' + apps[i].id + ')';
+      appsEl.appendChild(d);
+    }
+    var s = appsEl.children[sel];
+    if (s && s.scrollIntoView) s.scrollIntoView(false);
+  }
+
+  function launch(app) {
+    log('Launching ' + app.name + ' …');
+    try {
+      tizen.application.launch(app.id, function () {
+        log('launch() succeeded for ' + app.id);
+      }, function (e) {
+        log('launch() failed for ' + app.id + ': ' + errText(e));
+      });
+    } catch (e) { log('launch() threw: ' + errText(e)); }
+  }
+
+  document.addEventListener('keydown', function (ev) {
+    var k = ev.keyCode;
+    if (k === 10009) { history.back(); return; }          // Back / Return
+    if (k === 403) { checks.innerHTML = ''; loadApps(); return; } // Red
+    if (!apps.length) return;
+    var perCol = Math.ceil(apps.length / 3);
+    if (k === 40) sel = Math.min(apps.length - 1, sel + 1);        // Down
+    else if (k === 38) sel = Math.max(0, sel - 1);                 // Up
+    else if (k === 39) sel = Math.min(apps.length - 1, sel + perCol); // Right
+    else if (k === 37) sel = Math.max(0, sel - perCol);            // Left
+    else if (k === 13) { launch(apps[sel]); return; }              // Enter
+    else return;
+    ev.preventDefault();
+    render();
+  });
+})();
+</script>
+</body>
+</html>
