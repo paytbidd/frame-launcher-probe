@@ -26,8 +26,7 @@
     weather: null,           // { zip, place, hourly, daily } — NWS forecast URLs
     units: 'F',
     returnHome: true,        // reopen the launcher when an app it opened is closed
-    artMode: true,           // service shows the C700's album art in Art Mode
-    matte: 'shadowbox_black',
+    saverMins: 2,            // full-screen now playing after this many idle minutes (0 = off)
     amp: '192.168.1.159'
   };
 
@@ -109,20 +108,6 @@
   }
 
   var SERVICE = 'http://127.0.0.1:8095';
-  var MATTES = [
-    ['shadowbox_black', 'Shadowbox · black'], ['shadowbox_polar', 'Shadowbox · white'],
-    ['modern_black', 'Modern · black'], ['modern_warm', 'Modern · warm'],
-    ['modernthin_black', 'Thin · black'], ['none', 'No matte']
-  ];
-  function matteLabel(id) {
-    for (var i = 0; i < MATTES.length; i++) if (MATTES[i][0] === id) return MATTES[i][1];
-    return id;
-  }
-  // Tell the background service the settings it needs (amp address, album art options).
-  function syncService() {
-    fetch(SERVICE + '/config?amp=' + encodeURIComponent(cfg.amp) + '&art=' + (cfg.artMode ? 1 : 0) +
-      '&matte=' + encodeURIComponent(cfg.matte)).catch(function () {});
-  }
   // TizenBrew serves this page at /module/<module name, URL-encoded>/index.html
   function moduleName() {
     var m = location.pathname.match(/\/module\/([^\/]+)\//);
@@ -310,6 +295,7 @@
     $('np-art').style.backgroundImage = img ? 'url("' + img + '")' : '';
     $('np-vol').textContent = np.volume === '' ? '--' : np.volume;
     setPlayIcons(playing);
+    setMood(playing && img ? img : '');
     // Full-screen view
     setText('fs-source', (tag(doc, 'serviceName') || 'Now playing') + (playing || !title ? '' : '  ·  ' + np.state));
     setText('fs-title', title || 'Nothing playing');
@@ -329,6 +315,27 @@
     setText('fs-pos', np.totlen ? mmss(Math.min(np.secs, np.totlen)) : '');
     setText('fs-len', np.totlen ? mmss(np.totlen) : '');
   }
+  // Mood background: the launcher's background is a blurred copy of the current artwork,
+  // crossfaded between two layers when it changes; plain background when nothing plays.
+  var moodUrl = '', moodFlip = false;
+  function setMood(url) {
+    if (url === moodUrl) return;
+    moodUrl = url;
+    var box = $('mood');
+    if (!box) return;
+    if (!url) { box.className = 'mood'; box.children[0].className = 'mood-layer'; box.children[1].className = 'mood-layer'; return; }
+    var pre = new Image();
+    pre.onload = function () {
+      if (moodUrl !== url) return;                  // track changed again while loading
+      moodFlip = !moodFlip;
+      var show = box.children[moodFlip ? 0 : 1], hide = box.children[moodFlip ? 1 : 0];
+      show.style.backgroundImage = 'url("' + url + '")';
+      show.className = 'mood-layer show';
+      hide.className = 'mood-layer';
+      box.className = 'mood active';
+    };
+    pre.src = url;
+  }
   function mmss(t) { t = Math.floor(t); return Math.floor(t / 60) + ':' + (t % 60 < 10 ? '0' : '') + (t % 60); }
   function setPlayIcons(playing) {
     var a = document.querySelectorAll('.ic-play'), b = document.querySelectorAll('.ic-pause'), i;
@@ -337,17 +344,36 @@
   }
 
   // ---------- Full-screen now playing ----------
-  var fsOpen = false;
-  function openFs() {
+  var fsOpen = false, saverOn = false;
+  function openFs(asSaver) {
     fsOpen = true;
-    $('fs').className = 'fs';
+    saverOn = !!asSaver;
+    $('fs').className = 'fs' + (saverOn ? ' saver' : '');
     focus.refresh(1);                                  // start on play/pause
   }
   function closeFs() {
     fsOpen = false;
+    saverOn = false;
     $('fs').className = 'fs hidden';
     focus.refresh();
   }
+
+  // ---------- Screensaver ----------
+  // After cfg.saverMins without a key press, while music is playing, show the full-screen
+  // player without controls. Any key wakes it (and does nothing else).
+  var lastInput = Date.now(), quietSince = null;
+  setInterval(function () {
+    var playing = np.state === 'play' || np.state === 'stream';
+    if (saverOn) {
+      quietSince = playing ? null : (quietSince || Date.now());
+      if (quietSince && Date.now() - quietSince > 30000) closeFs();
+      return;
+    }
+    if (cfg.saverMins > 0 && playing && !settingsOpen && Date.now() - lastInput > cfg.saverMins * 60000) {
+      if (fsOpen) closeFs();
+      openFs(true);
+    }
+  }, 5000);
   setInterval(function () {
     if (np.state === 'play' || np.state === 'stream') { np.secs += 1; drawProgress(); }
   }, 1000);
@@ -375,7 +401,6 @@
     fetch(SERVICE + '/ping').then(function (r) { return r.json(); })
       .then(function (d) {
         diag.service = d.ok ? 'running ' + String(d.version).slice(0, 7) + ' (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error';
-        diag.art = d.art ? (d.art.enabled ? d.art.status : 'off') + (d.art.paired ? '' : ' · not paired yet') : 'n/a';
         diag.watch = (d.watching && d.watching.length ? 'watching ' + d.watching.join(', ') : 'idle') +
           (d.events && d.events.length ? '\n  ' + d.events.join('\n  ') : '');
       })
@@ -398,16 +423,14 @@
     });
     setText('v-units', cfg.units === 'C' ? '°C' : '°F');
     setText('v-return', cfg.returnHome ? 'On' : 'Off');
-    setText('v-artmode', cfg.artMode ? 'On' : 'Off');
-    setText('v-matte', matteLabel(cfg.matte));
-    var ai = document.querySelector('[data-set="artmode"]');
-    if (ai) ai.className = 'item focusable' + (cfg.artMode ? ' on' : '') + (ai.classList.contains('focused') ? ' focused' : '');
+    setText('v-saver', cfg.saverMins ? 'After ' + cfg.saverMins + ' min' : 'Off');
+
     var ri = document.querySelector('[data-set="return"]');
     if (ri) ri.className = 'item focusable' + (cfg.returnHome ? ' on' : '') + (ri.classList.contains('focused') ? ' focused' : '');
     setVal('in-zip', cfg.weather ? cfg.weather.zip : '');
     setVal('in-amp', cfg.amp);
     setText('diag',  'service: ' + diag.service + '\ntizen in page: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
-      '\nlast launch: ' + diag.launch + '\nart mode: ' + (diag.art || '—') + '\nreturn watcher: ' + (diag.watch || '—') + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
+      '\nlast launch: ' + diag.launch +  '\nreturn watcher: ' + (diag.watch || '—') + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
     if (settingsOpen) focus.refresh();
   }
 
@@ -437,13 +460,12 @@
     }
     var s = el.getAttribute('data-set');
     if (s === 'return') { cfg.returnHome = !cfg.returnHome; saveConfig(); renderSettingsApps(); }
-    else if (s === 'artmode') { cfg.artMode = !cfg.artMode; saveConfig(); syncService(); renderSettingsApps(); }
-    else if (s === 'matte') {
-      var mi = 0;
-      for (var j = 0; j < MATTES.length; j++) if (MATTES[j][0] === cfg.matte) mi = j;
-      cfg.matte = MATTES[(mi + 1) % MATTES.length][0];
-      saveConfig(); syncService(); renderSettingsApps();
+    else if (s === 'saver') {
+      var opts = [0, 1, 2, 5, 10], si = opts.indexOf(cfg.saverMins);
+      cfg.saverMins = opts[(si + 1) % opts.length];
+      saveConfig(); renderSettingsApps();
     }
+
     else if (s === 'units') { cfg.units = cfg.units === 'C' ? 'F' : 'C'; saveConfig(); renderSettingsApps(); loadWeather(); }
     else if (s === 'close') closeSettings();
     else if (s === 'zip' || s === 'amp') { var inp = el.getElementsByTagName('input')[0]; inp.focus(); inp.select(); }
@@ -456,7 +478,6 @@
       np.etag = '';
       pollStatus();
       toast('Receiver set to ' + cfg.amp);
-      syncService();
     }
     inp.blur();
   }
@@ -539,6 +560,8 @@
 
   document.addEventListener('keydown', function (ev) {
     var k = ev.keyCode, t = ev.target;
+    lastInput = Date.now();
+    if (saverOn) { ev.preventDefault(); closeFs(); return; }   // first press only wakes
 
     // Typing in a settings field: let the on-screen keyboard work.
     if (t && t.tagName === 'INPUT') {
@@ -608,7 +631,6 @@
 
   // ---------- Start ----------
   pingService();
-  syncService();
   setTimeout(checkForUpdate, 3000);
   setInterval(checkForUpdate, 6 * 60 * 60 * 1000);   // launcher may stay open for days
   tickClock();

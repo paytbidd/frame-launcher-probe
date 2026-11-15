@@ -2,7 +2,7 @@
    amber signal, Bricolage Grotesque display over Figtree body. Sized for 1920x1080 at couch distance. */
 :root {
   --bg: #0D1A21;
-  --surface: #15262F;
+  --surface: rgba(21, 38, 47, 0.72);
   --line: #2B414C;
   --ink: #E8F0F3;
   --muted: #9BB0BA;
@@ -21,6 +21,7 @@ html, body {
   margin: 0; width: 1920px; height: 1080px; overflow: hidden;
   background: var(--bg); color: var(--ink); font-family: var(--body);
 }
+body { background: transparent; }   /* html paints the base color; the mood layer sits between */
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; }
 
 .eyebrow, .np-source, .sect {
@@ -94,7 +95,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 /* Settings */
 .settings { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: rgba(6, 14, 18, 0.7); display: flex; justify-content: flex-end; }
 .settings.hidden { display: none; }
-.panel { width: 780px; height: 100%; background: var(--surface); border-left: 2px solid var(--line); padding: 72px 64px; overflow: hidden; }
+.panel { width: 780px; height: 100%; background: #15262F; border-left: 2px solid var(--line); padding: 72px 64px; overflow: hidden; }
 .panel h2 { margin: 0 0 18px; font-family: var(--display); font-size: 60px; font-weight: 700; }
 .sect { margin: 34px 0 8px; }
 .item {
@@ -170,3 +171,27 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .fs-controls .ctl-sm svg { width: 30px; height: 30px; }
 .fs-controls .vol { margin-left: 40px; padding-left: 40px; border-left-color: rgba(232, 240, 243, 0.14); }
 .fs-hint { position: absolute; left: 140px; bottom: 70px; font-size: 24px; color: var(--muted); }
+
+/* Screensaver: full-screen player without controls, drifting slowly to protect the panel */
+.fs.saver .fs-controls, .fs.saver .fs-hint { display: none; }
+.fs.saver .fs-main { animation: fl-drift 90s ease-in-out infinite alternate; }
+.fs.saver .fs-top { animation: fl-drift 70s ease-in-out infinite alternate-reverse; }
+@keyframes fl-drift {
+  0% { transform: translate(-30px, -20px); }
+  50% { transform: translate(25px, 15px); }
+  100% { transform: translate(-15px, 25px); }
+}
+
+/* Mood background: blurred, saturated copy of the current artwork behind the launcher */
+.mood { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; z-index: -1; }
+.mood-layer {
+  position: absolute; left: -160px; top: -160px; right: -160px; bottom: -160px;
+  background: center / cover no-repeat; filter: blur(90px) saturate(1.8) brightness(1.1);
+  opacity: 0; transition: opacity 1400ms ease;
+}
+.mood-layer.show { opacity: 1; }
+.mood-shade {
+  position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: 0; transition: opacity 1400ms ease;
+  background: linear-gradient(180deg, rgba(13, 26, 33, 0.38) 0%, rgba(13, 26, 33, 0.18) 45%, rgba(13, 26, 33, 0.62) 100%);
+}
+.mood.active .mood-shade { opacity: 1; }
