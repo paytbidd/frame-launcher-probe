@@ -478,7 +478,14 @@
       var el = current();
       if (el) {
         el.classList.add('focused');
-        if (settingsOpen && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+        if (settingsOpen && el.scrollIntoView) {
+          el.scrollIntoView({ block: 'nearest' });
+          // On the last item (Done), show the status text below it too.
+          if (el.getAttribute('data-set') === 'close') {
+            var panel = document.querySelector('#settings .panel');
+            if (panel) panel.scrollTop = panel.scrollHeight;
+          }
+        }
         var box = el.parentNode;
         if (box && box.id === 'apps') {
           // Keep the focused tile inside the 120px side margins, scrolling the row as needed.
