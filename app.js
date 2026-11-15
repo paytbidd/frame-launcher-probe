@@ -26,6 +26,8 @@
     weather: null,           // { zip, place, hourly, daily } — NWS forecast URLs
     units: 'F',
     returnHome: true,        // reopen the launcher when an app it opened is closed
+    artMode: true,           // service shows the C700's album art in Art Mode
+    matte: 'shadowbox_black',
     amp: '192.168.1.159'
   };
 
@@ -107,6 +109,20 @@
   }
 
   var SERVICE = 'http://127.0.0.1:8095';
+  var MATTES = [
+    ['shadowbox_black', 'Shadowbox · black'], ['shadowbox_polar', 'Shadowbox · white'],
+    ['modern_black', 'Modern · black'], ['modern_warm', 'Modern · warm'],
+    ['modernthin_black', 'Thin · black'], ['none', 'No matte']
+  ];
+  function matteLabel(id) {
+    for (var i = 0; i < MATTES.length; i++) if (MATTES[i][0] === id) return MATTES[i][1];
+    return id;
+  }
+  // Tell the background service the settings it needs (amp address, album art options).
+  function syncService() {
+    fetch(SERVICE + '/config?amp=' + encodeURIComponent(cfg.amp) + '&art=' + (cfg.artMode ? 1 : 0) +
+      '&matte=' + encodeURIComponent(cfg.matte)).catch(function () {});
+  }
   // TizenBrew serves this page at /module/<module name, URL-encoded>/index.html
   function moduleName() {
     var m = location.pathname.match(/\/module\/([^\/]+)\//);
@@ -359,6 +375,7 @@
     fetch(SERVICE + '/ping').then(function (r) { return r.json(); })
       .then(function (d) {
         diag.service = d.ok ? 'running ' + String(d.version).slice(0, 7) + ' (tizen ' + (d.tizen ? 'yes' : 'no') + ')' : 'error';
+        diag.art = d.art ? (d.art.enabled ? d.art.status : 'off') + (d.art.paired ? '' : ' · not paired yet') : 'n/a';
         diag.watch = (d.watching && d.watching.length ? 'watching ' + d.watching.join(', ') : 'idle') +
           (d.events && d.events.length ? '\n  ' + d.events.join('\n  ') : '');
       })
@@ -381,12 +398,16 @@
     });
     setText('v-units', cfg.units === 'C' ? '°C' : '°F');
     setText('v-return', cfg.returnHome ? 'On' : 'Off');
+    setText('v-artmode', cfg.artMode ? 'On' : 'Off');
+    setText('v-matte', matteLabel(cfg.matte));
+    var ai = document.querySelector('[data-set="artmode"]');
+    if (ai) ai.className = 'item focusable' + (cfg.artMode ? ' on' : '') + (ai.classList.contains('focused') ? ' focused' : '');
     var ri = document.querySelector('[data-set="return"]');
     if (ri) ri.className = 'item focusable' + (cfg.returnHome ? ' on' : '') + (ri.classList.contains('focused') ? ' focused' : '');
     setVal('in-zip', cfg.weather ? cfg.weather.zip : '');
     setVal('in-amp', cfg.amp);
     setText('diag',  'service: ' + diag.service + '\ntizen in page: ' + (diag.tizen ? 'yes' : 'no') + '\ngetAppsInfo: ' + diag.appsInfo +
-      '\nlast launch: ' + diag.launch + '\nreturn watcher: ' + (diag.watch || '—') + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
+      '\nlast launch: ' + diag.launch + '\nart mode: ' + (diag.art || '—') + '\nreturn watcher: ' + (diag.watch || '—') + '\nversion: ' + (document.querySelector('base') ? document.querySelector('base').href : location.href));
     if (settingsOpen) focus.refresh();
   }
 
@@ -416,6 +437,13 @@
     }
     var s = el.getAttribute('data-set');
     if (s === 'return') { cfg.returnHome = !cfg.returnHome; saveConfig(); renderSettingsApps(); }
+    else if (s === 'artmode') { cfg.artMode = !cfg.artMode; saveConfig(); syncService(); renderSettingsApps(); }
+    else if (s === 'matte') {
+      var mi = 0;
+      for (var j = 0; j < MATTES.length; j++) if (MATTES[j][0] === cfg.matte) mi = j;
+      cfg.matte = MATTES[(mi + 1) % MATTES.length][0];
+      saveConfig(); syncService(); renderSettingsApps();
+    }
     else if (s === 'units') { cfg.units = cfg.units === 'C' ? 'F' : 'C'; saveConfig(); renderSettingsApps(); loadWeather(); }
     else if (s === 'close') closeSettings();
     else if (s === 'zip' || s === 'amp') { var inp = el.getElementsByTagName('input')[0]; inp.focus(); inp.select(); }
@@ -428,6 +456,7 @@
       np.etag = '';
       pollStatus();
       toast('Receiver set to ' + cfg.amp);
+      syncService();
     }
     inp.blur();
   }
@@ -572,6 +601,7 @@
 
   // ---------- Start ----------
   pingService();
+  syncService();
   setTimeout(checkForUpdate, 3000);
   setInterval(checkForUpdate, 6 * 60 * 60 * 1000);   // launcher may stay open for days
   tickClock();
